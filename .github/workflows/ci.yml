@@ -1,0 +1,29 @@
+name: ci
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  test-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - name: Build .mcpb and publish the release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          npm run pack
+          awk -v v="$V" '$0 ~ "^## "v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          echo "" >> notes.md
+          echo "Install: download android-control-$V.mcpb, double-click it (or Claude Desktop > Settings > Extensions > Install Extension), then start a new conversation." >> notes.md
+          gh release create "$GITHUB_REF_NAME" "android-control-$V.mcpb" --title "$GITHUB_REF_NAME" --notes-file notes.md
