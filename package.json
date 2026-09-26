@@ -1,11 +1,11 @@
 {
   "name": "android-control-mcp",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Self-installing Android phone control MCP server, packaged as a Claude Desktop extension (.mcpb)",
   "scripts": {
     "build": "esbuild src/index.js --bundle --platform=node --format=esm --target=node18 --outfile=bundle/server/index.mjs --banner:js=\"import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);\" --minify-syntax --legal-comments=none && node -e \"for (const f of ['LICENSE','THIRD_PARTY_NOTICES.md']) require('fs').copyFileSync(f, 'bundle/' + f)\"",
     "pack": "npm run build && mcpb pack bundle android-control-$npm_package_version.mcpb",
-    "test": "npm run build && node test/match.test.mjs && node test/smoke.mjs"
+    "test": "npm run build && node test/match.test.mjs && node test/units.test.mjs && node test/smoke.mjs && node test/fixes.test.mjs"
   },
   "author": "",
   "license": "MIT",
@@ -21,5 +21,9 @@
     "esbuild": "^0.28.2"
   },
   "type": "module",
-  "private": true
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brandonbowmansr/android-autopilot-mcp.git"
+  }
 }

@@ -19,6 +19,7 @@ export function parseUiXml(xml) {
     const node = {
       text: attrs.text || "",
       desc: attrs["content-desc"] || "",
+      hint: attrs.hint || "",
       id: attrs["resource-id"] || "",
       cls: (attrs.class || "").replace(/^android\.(widget|view)\./, ""),
       pkg: attrs.package || "",
@@ -36,6 +37,8 @@ export function parseUiXml(xml) {
       depth: stack.length,
       parent: stack.length ? stack[stack.length - 1] : -1,
     };
+    // Many fields report their placeholder as their text when empty; the real value is then "".
+    node.value = node.editable ? (node.hint && node.text === node.hint ? "" : node.text) : "";
     nodes.push(node);
     if (m[2] !== "/") stack.push(nodes.length - 1);
   }
@@ -61,7 +64,9 @@ export function interestingElements(nodes, { mode = "useful" } = {}) {
     const actionable = n.clickable || n.editable || n.scrollable || n.checkable;
     const hasLabel = n.text || n.desc;
     if (mode === "all" || actionable || hasLabel) {
-      out.push({ ...n, label: n.text || n.desc || (n.clickable || n.editable || n.checkable ? inheritLabel(nodes, i) : ""), raw: i });
+      const lbl = n.editable ? (n.value || n.hint || n.desc || inheritLabel(nodes, i))
+        : n.text || n.desc || (n.clickable || n.checkable ? inheritLabel(nodes, i) : "");
+      out.push({ ...n, label: lbl, raw: i });
     }
   });
   // Drop text-only children fully covered by an actionable parent carrying the same label (noise).
@@ -83,15 +88,22 @@ export function interestingElements(nodes, { mode = "useful" } = {}) {
 
 export const center = (b) => ({ x: Math.round((b.x1 + b.x2) / 2), y: Math.round((b.y1 + b.y2) / 2) });
 
-export function formatElements(els, { limit = 250 } = {}) {
+// maxLen: how much of each label to show (full_text=true passes Infinity). Input fields always show their
+// value and hint separately, and get a longer limit so typed text can be checked.
+export function formatElements(els, { limit = 250, maxLen = 80 } = {}) {
+  const cut = (t, n) => { const u = t.replace(/\s+/g, " "); return u.length > n ? u.slice(0, n) + `... (+${u.length - n} chars)` : u; };
   const lines = els.slice(0, limit).map((e) => {
     const flags = [
       e.clickable && "tap", e.editable && "input", e.scrollable && "scroll", e.checkable && (e.checked ? "checked" : "unchecked"),
       e.focused && "focused", e.selected && "selected", !e.enabled && "disabled", e.password && "password",
     ].filter(Boolean).join(",");
     const id = e.id ? ` id=${e.id.replace(/^[\w.]+:id\//, "")}` : "";
-    const lbl = e.label ? ` "${e.label.replace(/\s+/g, " ").slice(0, 80)}"` : "";
-    const desc = e.desc && e.desc !== e.label ? ` desc="${e.desc.slice(0, 60)}"` : "";
+    let lbl;
+    if (e.editable) {
+      lbl = ` value="${cut(e.value || "", Math.max(maxLen, 300))}"` + (e.hint ? ` hint="${cut(e.hint, 60)}"` : "") +
+        (!e.hint && e.label && e.label !== e.value ? ` label="${cut(e.label, 60)}"` : "");
+    } else lbl = e.label ? ` "${cut(e.label, maxLen)}"` : "";
+    const desc = e.desc && e.desc !== e.label ? ` desc="${cut(e.desc, Math.min(maxLen, 60))}"` : "";
     return `[${e.index}] ${e.cls}${lbl}${desc}${id}${flags ? " {" + flags + "}" : ""}`;
   });
   if (els.length > limit) lines.push(`... ${els.length - limit} more (use query to narrow)`);
@@ -112,7 +124,7 @@ export function findElement(els, query, { exact = false } = {}) {
   if (!q) return null;
   const scored = [];
   for (const e of els) {
-    const fields = [e.label, e.text, e.desc, e.id.replace(/^[\w.]+:id\//, "")].map(norm);
+    const fields = [e.label, e.text, e.desc, e.hint, e.id.replace(/^[\w.]+:id\//, "")].map(norm);
     let s = 0;
     if (fields.some((f) => f === q)) s = 100;
     else if (!exact && fields.some((f) => f.startsWith(q))) s = 70;

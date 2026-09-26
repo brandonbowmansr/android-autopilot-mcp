@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "android-control",
   "display_name": "Android Phone Control",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Let Claude see and operate an Android phone: fast screen reading, screenshots, tap, type (any language/emoji), swipe, apps. Installs its own adb; no admin rights, no Android SDK.",
   "long_description": "Drives an Android phone through Google's adb. On first use it downloads Android platform-tools into your user profile (%LOCALAPPDATA%\\android-control-mcp on Windows), so nothing needs admin rights or a PATH change. Connect over Wi-Fi with Wireless debugging (Android 11+, no USB drivers) or over USB. Claude reads the screen as a numbered element list or an annotated screenshot, then taps, types, scrolls, presses keys, and launches apps. A tiny on-phone helper (pushed over adb, not an app install) makes screen reads ~15 ms and screenshots ~0.2 s, with automatic fallback to plain adb. Run the android_doctor tool first.",
   "author": {
@@ -131,6 +131,26 @@
     {
       "name": "android_shell",
       "description": "Run a raw adb shell command"
+    },
+    {
+      "name": "android_fill_form",
+      "description": "Fill several input fields in one call, verify each, then tap submit"
+    },
+    {
+      "name": "android_set_date",
+      "description": "Set an open date picker to a date in one call"
+    },
+    {
+      "name": "android_get_otp",
+      "description": "Read the latest verification code from notifications"
+    },
+    {
+      "name": "android_keep_awake",
+      "description": "Keep the screen awake during a task, then restore settings"
+    },
+    {
+      "name": "android_recipe",
+      "description": "Save and replay step lists for apps you use often"
     }
   ],
   "compatibility": {

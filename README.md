@@ -19,7 +19,7 @@ scroll, keys, launching apps, deep links, and raw shell.
 
 ## Install (Claude Desktop / Cowork)
 
-1. Download `android-control-0.3.1.mcpb` from [Releases](https://github.com/brandonbowmansr/android-autopilot-mcp/releases/latest). Double-click it, or go to Settings > Extensions > Install Extension and pick the file.
+1. Download the latest `android-control-<version>.mcpb` from [Releases](https://github.com/brandonbowmansr/android-autopilot-mcp/releases/latest). Double-click it, or go to Settings > Extensions > Install Extension and pick the file.
 2. Leave both settings blank (they're only overrides).
 3. Start a **new** conversation and ask: "run android_doctor".
    - First run downloads Google's platform-tools (~7 MB) into `%LOCALAPPDATA%\android-control-mcp\`.
@@ -54,10 +54,11 @@ Not possible: **adb over Bluetooth** (adb has no Bluetooth transport). Bluetooth
 
 ## How Claude uses it
 
-- `android_screenshot` returns a JPEG (downscaled to what vision models actually use) with
+- `android_ui` reads the screen as a numbered text list. It's the default way to look: fast and cheap. Input fields show their value and hint separately; `full_text=true` shows long text uncut.
+- `android_screenshot` returns a small JPEG (about 400 tokens; `size=medium|large` for fine print) with
   numbered boxes on tappable elements, plus the matching list. Then `android_tap element=7`.
-- `android_ui` gives the same list as text only. It's faster and cheaper; use it when the look of the screen doesn't matter.
-- Action tools take `observe: "ui" | "screenshot"` to return the new screen in the same call.
+- Action tools return the new screen as text by default (`observe: "ui"`), so there's no extra round trip. `observe: "none"` skips it; `"screenshot"` returns a small image.
+- `android_fill_form` fills a whole form in one call and checks every field; `android_type` checks its field too.
 - Coordinates Claude reads off a screenshot can go straight to `android_tap`/`android_swipe`;
   the server converts them to device pixels.
 
@@ -67,12 +68,17 @@ Not possible: **adb over Bluetooth** (adb has no Bluetooth transport). Bluetooth
 |---|---|
 | android_doctor | find/install adb, detect phone brand (Windows), list devices, setup steps |
 | android_setup_guide | brand-specific steps for wifi / usb / hotspot |
-| android_pair / android_connect | Wi-Fi pairing and connection (auto-discovers paired phones; diagnoses network blocks) |
+| android_pair / android_connect | Wi-Fi pairing and connection. `android_connect` with no arguments tries network discovery, then remembered phones and port 5555 on the local network. `stay_reachable=true` keeps the phone reachable without a new code until it reboots |
 | android_tcpip | switch a connected phone to classic adb-over-TCP :5555 |
-| android_devices / android_select_device | list devices, pick default |
+| android_devices / android_select_device | list devices (two connections to one phone count as one), pick default |
 | android_status | model, Android version, screen on/locked, battery, foreground app |
 | android_screenshot / android_ui | see the screen |
-| android_tap / android_type / android_swipe / android_scroll / android_key | act |
+| android_tap / android_type / android_swipe / android_scroll / android_key | act. Taps that would land on the on-screen keyboard are caught; typing is read back and refused while the phone is locked |
+| android_fill_form | fill several fields (by label, hint or id), verify each, retry slowly once, then tap submit |
+| android_set_date | set an open date picker (wheel/spinner or calendar text mode) in one call |
+| android_get_otp | read the latest verification code from notifications, optionally waiting for it |
+| android_keep_awake | stop the screen sleeping mid-task; restores the phone's own settings afterwards |
+| android_recipe | save and replay step lists for apps you use often, with {{vars}} for personal values |
 | android_unlock | wake + swipe up (optional PIN) |
 | android_launch_app / android_list_apps / android_open_url | apps and deep links |
 | android_wait_for | wait for text to appear or disappear |
@@ -98,6 +104,11 @@ If it can't run on a phone, everything falls back to plain adb automatically. Se
 ## Behaviors worth knowing
 
 - **Tap-by-text won't guess.** If several different elements match equally well (three "Page" dots, two "OK" buttons), you get the numbered candidates back instead of a tap on the wrong one.
+- **Typing checks itself.** After typing, the field is read back. With `clear=true` (and always in `android_fill_form`) a mismatch is retried once, one character at a time (`method=keys`), which is what laggy React Native / Flutter fields need. Password fields can only be checked by length.
+- **Keyboard guard.** If a tap would land on the on-screen keyboard (a classic source of stray "5"s), the tool closes the keyboard and re-finds the element, or, for raw coordinates, stops and asks for a fresh read. `allow_keyboard=true` overrides.
+- **Lock guard.** Typing, forms and date setting refuse to run while the phone is locked or asleep, instead of losing the text. `android_keep_awake` prevents it.
+- **`stay_reachable` opens adb port 5555** on the phone until it reboots. Another computer still needs you to approve it on the phone, but only turn it on for networks you trust (e.g. your PC's own hotspot).
+- **Recipes live on your computer** (`<data dir>/recipes/*.json`). Values you pass in `vars` are not saved.
 - **Apps resume where they were left.** Use `android_launch_app restart=true` to open one fresh at its main screen. The tool waits until the app is actually in front before returning.
 
 ## Known limits (honest list)
@@ -119,7 +130,7 @@ This project is not affiliated with Google or Anthropic.
 
 ```
 npm install
-npm test        # builds, runs 21-tool smoke test (Linux/macOS/WSL) against test/fake-adb.cjs
+npm test        # builds; runs unit tests, the smoke test, and end-to-end fix tests against a simulated phone (Linux/macOS/WSL)
 npm run pack    # -> android-control-<version>.mcpb
 ```
 

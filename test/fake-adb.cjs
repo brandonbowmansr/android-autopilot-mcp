@@ -4,6 +4,7 @@ const fs = require("fs"); const path = require("path");
 const { PNG } = require(path.join(__dirname, "..", "node_modules", "pngjs"));
 let args = process.argv.slice(2);
 if (process.env.FAKE_ADB_LOG) fs.appendFileSync(process.env.FAKE_ADB_LOG, JSON.stringify(args) + "\n");
+if (process.env.FAKE_STATE && require("./fake-phone.cjs")(args, (t) => process.stdout.write(t))) process.exit(0);
 if (args[0] === "-s") args = args.slice(2);
 const [cmd, ...rest] = args; const s = rest.join(" ");
 const out = (t) => process.stdout.write(t);

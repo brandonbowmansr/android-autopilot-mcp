@@ -118,5 +118,8 @@ export function helperStatus(serial) {
   return s && !s.dead ? "running" : "not started (starts on first use)";
 }
 
+export function stopHelper(serial) { const s = sessions.get(serial); if (s) s.kill("stopped for uiautomator"); }
+export function helperRunning(serial) { const s = sessions.get(serial); return !!(s && !s.dead); }
+
 export function stopAllHelpers() { for (const s of sessions.values()) s.kill("shutdown"); }
 process.on("exit", stopAllHelpers);

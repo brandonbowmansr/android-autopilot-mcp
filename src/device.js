@@ -2,7 +2,7 @@
 import { adb, listDevices, AdbError } from "./adb.js";
 import { parseUiXml, interestingElements, center } from "./ui.js";
 import { decodePng, decodeJpeg, resize, annotate, encodeJpeg, fitScale } from "./image.js";
-import { getHelper, HelperError } from "./helper.js";
+import { getHelper, HelperError, stopHelper, helperRunning } from "./helper.js";
 
 // Run fn(helper) when the on-phone helper is available; otherwise (or on helper failure) run fallback().
 async function withHelper(serial, fn, fallback) {
@@ -21,6 +21,7 @@ const dev = (serial) => {
 };
 
 export function selectDevice(serial) { state.selected = serial; }
+export const devState = (serial) => dev(serial);
 
 // Resolve which device to talk to. Explicit > selected (if still attached) > the only one attached.
 let devCache = { at: 0, list: null };
@@ -49,7 +50,35 @@ export async function resolveSerial(serial) {
     if (bad) throw new AdbError(stateHelp(bad));
     throw new AdbError("No Android device connected. Run android_doctor for setup steps (wireless pairing needs no drivers or admin rights).");
   }
-  throw new AdbError(`Several devices attached (${ready.map((d) => `${d.serial} ${d.model || ""}`).join("; ")}). Pass serial or call android_select_device.`);
+  // The same phone often shows up twice over Wi-Fi (IP:port and its mDNS name). Those are one device.
+  const groups = await groupPhysical(ready);
+  if (groups.length === 1) {
+    const g = groups[0];
+    const pick = g.find((d) => d.serial === state.selected) || g.find((d) => helperRunning(d.serial)) || g[0];
+    return pick.serial;
+  }
+  throw new AdbError(`Several phones attached (${groups.map((g) => g.map((d) => `${d.serial} ${d.model || ""}`).join(" = ")).join("; ")}). Pass serial or call android_select_device.`);
+}
+
+// Hardware serial per adb serial (cached): lets us tell "two connections to one phone" from "two phones".
+const hwCache = new Map();
+export async function hardwareSerial(serial) {
+  if (hwCache.has(serial)) return hwCache.get(serial);
+  let hw = "";
+  try { hw = (await adb(["shell", "getprop ro.serialno"], { serial, timeout: 8000 })).trim(); } catch {}
+  if (!hw) { const m = /^adb-([^-]+)-/.exec(serial); hw = m ? m[1] : serial; }
+  hwCache.set(serial, hw);
+  return hw;
+}
+
+export async function groupPhysical(devices) {
+  const by = new Map();
+  for (const d of devices) {
+    const hw = d.state === "device" ? await hardwareSerial(d.serial) : d.serial;
+    if (!by.has(hw)) by.set(hw, []);
+    by.get(hw).push({ ...d, hw });
+  }
+  return [...by.values()];
 }
 
 function stateHelp(d) {
@@ -63,24 +92,26 @@ export const sh = (serial, cmd, opts = {}) => adb(["shell", cmd], { serial, ...o
 export const quote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 // ---------- UI tree ----------
-export async function dumpUi(serial, { mode = "useful", retries = 3 } = {}) {
+// windows="all" also reads other windows (keyboard, system bars) and doesn't replace the numbered element list.
+export async function dumpUi(serial, { mode = "useful", retries = 3, windows = "active" } = {}) {
   const fromXml = (xml) => {
     const nodes = parseUiXml(xml);
     const els = interestingElements(nodes, { mode });
-    dev(serial).elements = els;
-    dev(serial).dumpedAt = Date.now();
+    if (windows === "active") { dev(serial).elements = els; dev(serial).dumpedAt = Date.now(); }
     return { nodes, elements: els };
   };
   return withHelper(serial, async (h) => {
     let last;
     for (let i = 0; i < 4; i++) {
       try {
-        const r = await h.send("dump", 10000);
+        const r = await h.send(windows === "all" ? "dump all" : "dump", 10000);
         return fromXml(r.slice(r.indexOf(" ") + 1));
       } catch (e) { last = e; if (!(e instanceof HelperError)) throw e; await new Promise((r) => setTimeout(r, 150)); }
     }
     throw last;
   }, async () => {
+    // uiautomator needs the single UiAutomation slot; a live helper holds it and makes the dump fail.
+    stopHelper(serial);
     const f = "/data/local/tmp/.acm_ui.xml";
     let lastErr;
     for (let i = 0; i < retries; i++) {
@@ -107,8 +138,10 @@ export function cachedElement(serial, index) {
 }
 
 // ---------- screenshots ----------
-export async function screenshot(serial, { annotateElements = false, quality = 70 } = {}) {
-  const maxEdge = 1568, maxPixels = 1_150_000;
+// Image tokens scale with pixel count (about w*h/750), so the long edge is the cost knob.
+export const SHOT_SIZES = { small: 800, medium: 1200, large: 1568 };
+export async function screenshot(serial, { annotateElements = false, quality = 70, maxEdge = SHOT_SIZES.small } = {}) {
+  const maxPixels = 1_150_000;
   const shot = await withHelper(serial, async (h) => {
     const [ , devW, devH, w, hgt, b64] = (await h.send(`shot ${maxEdge} ${maxPixels} ${quality}`, 15000)).split(" ");
     return { jpegIn: Buffer.from(b64, "base64"), deviceW: +devW, deviceH: +devH, imgW: +w, imgH: +hgt, scale: +w / +devW };
