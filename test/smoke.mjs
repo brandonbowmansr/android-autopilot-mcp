@@ -1,0 +1,28 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import fs from "node:fs";
+const LOG = "/tmp/claude-fakeadb.log"; fs.rmSync(LOG, { force: true });
+const t = new StdioClientTransport({ command: "node", args: [new URL("../bundle/server/index.mjs", import.meta.url).pathname],
+  env: { ...process.env, ADB_PATH: new URL("./adb", import.meta.url).pathname, FAKE_ADB_LOG: LOG }, stderr: "inherit" });
+const c = new Client({ name: "smoke", version: "0" }); await c.connect(t);
+const tools = (await c.listTools()).tools; console.log("TOOLS", tools.length, tools.map(x => x.name).join(","));
+const call = async (name, args = {}) => { const r = await c.callTool({ name, arguments: args });
+  const txt = r.content.filter(x => x.type === "text").map(x => x.text).join("\n"); const img = r.content.find(x => x.type === "image");
+  console.log(`\n== ${name} ${JSON.stringify(args)} ${r.isError ? "ERROR" : "ok"}${img ? ` [image ${img.mimeType} ${Math.round(img.data.length*0.75/1024)}KB]` : ""}\n${txt.slice(0, 900)}`);
+  if (img) fs.writeFileSync("/tmp/claude-shot.jpg", Buffer.from(img.data, "base64")); return r; };
+await call("android_doctor"); await call("android_status"); await call("android_ui");
+await call("android_screenshot");
+await call("android_tap", { element: 2 }); await call("android_tap", { text: "settings" }); await call("android_tap", { x: 360, y: 800 });
+await call("android_type", { value: "it's a test; rm -rf $HOME", text: "search", clear: true, submit: true });
+await call("android_type", { value: "héllo" });
+await call("android_scroll", { direction: "down" }); await call("android_key", { key: "back", times: 2 }); await call("android_key", { key: "notifications" });
+await call("android_launch_app", { app: "outlook" }); await call("android_pair", { host_port: "192.168.1.50:37000", code: "123456" });
+await call("android_connect", {}); await call("android_open_url", { url: "https://example.com/?a=1&b=2" });
+await call("android_wait_for", { text: "Inbox", timeout_s: 3 }); await call("android_tap", { element: 99 });
+await call("android_tap", { text: "send", observe: "ui" });
+await call("android_setup_guide", { brand: "Samsung", method: "usb" });
+await call("android_setup_guide", { brand: "redmi", method: "hotspot" });
+await call("android_pair", { host_port: "127.0.0.1:9", code: "000000" });
+await call("android_tcpip", {});
+await c.close();
+console.log("\n--- adb calls ---\n" + fs.readFileSync(LOG, "utf8").split("\n").filter(l => /input|monkey|am start|pair/.test(l)).join("\n"));

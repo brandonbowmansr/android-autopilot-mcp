@@ -1,0 +1,1 @@
+package android.view.accessibility; public final class AccessibilityWindowInfo { public AccessibilityNodeInfo getRoot() { return null; } public int getType() { return 0; } public int getLayer() { return 0; } public boolean isActive() { return false; } }

@@ -1,0 +1,19 @@
+# deps / build output (release the .mcpb via GitHub Releases, don't commit it)
+node_modules/
+bundle/server/
+bundle/LICENSE
+bundle/THIRD_PARTY_NOTICES.md
+*.mcpb
+test/*-bundled.mjs
+test/host-test.mjs
+
+# local tool cache (Dropbox-ignored) and helper build output
+.local-cache/
+helper/build/
+
+# private: machine/network specifics and real-device captures
+PROJECT.md
+NOTES.local.md
+test/live-shot*.jpg
+*.log
+RETRO-*.md

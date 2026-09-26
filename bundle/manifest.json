@@ -1,0 +1,146 @@
+{
+  "manifest_version": "0.3",
+  "name": "android-control",
+  "display_name": "Android Phone Control",
+  "version": "0.3.1",
+  "description": "Let Claude see and operate an Android phone: fast screen reading, screenshots, tap, type (any language/emoji), swipe, apps. Installs its own adb; no admin rights, no Android SDK.",
+  "long_description": "Drives an Android phone through Google's adb. On first use it downloads Android platform-tools into your user profile (%LOCALAPPDATA%\\android-control-mcp on Windows), so nothing needs admin rights or a PATH change. Connect over Wi-Fi with Wireless debugging (Android 11+, no USB drivers) or over USB. Claude reads the screen as a numbered element list or an annotated screenshot, then taps, types, scrolls, presses keys, and launches apps. A tiny on-phone helper (pushed over adb, not an app install) makes screen reads ~15 ms and screenshots ~0.2 s, with automatic fallback to plain adb. Run the android_doctor tool first.",
+  "author": {
+    "name": "Brandon Bowman"
+  },
+  "license": "MIT",
+  "keywords": [
+    "android",
+    "adb",
+    "phone",
+    "mobile",
+    "automation"
+  ],
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.mjs"
+      ],
+      "env": {
+        "ADB_PATH": "${user_config.adb_path}",
+        "ANDROID_CONTROL_PLATFORM_TOOLS_URL": "${user_config.platform_tools_url}"
+      }
+    }
+  },
+  "user_config": {
+    "adb_path": {
+      "type": "string",
+      "title": "adb location (optional)",
+      "description": "Leave blank to auto-install. Otherwise the full path to adb.exe or to a platform-tools folder you already have.",
+      "required": false,
+      "default": ""
+    },
+    "platform_tools_url": {
+      "type": "string",
+      "title": "platform-tools download URL (optional)",
+      "description": "Leave blank to use Google's official download. Set only if your network needs a mirror.",
+      "required": false,
+      "default": ""
+    }
+  },
+  "tools": [
+    {
+      "name": "android_doctor",
+      "description": "Check/install adb, list devices, show setup steps"
+    },
+    {
+      "name": "android_setup_guide",
+      "description": "Brand-specific setup steps for wifi, usb, or hotspot"
+    },
+    {
+      "name": "android_devices",
+      "description": "List connected devices"
+    },
+    {
+      "name": "android_pair",
+      "description": "Pair over Wi-Fi with a pairing code"
+    },
+    {
+      "name": "android_connect",
+      "description": "Connect to a paired phone over Wi-Fi"
+    },
+    {
+      "name": "android_tcpip",
+      "description": "Switch a connected phone to adb over TCP port 5555"
+    },
+    {
+      "name": "android_select_device",
+      "description": "Pick the default device"
+    },
+    {
+      "name": "android_status",
+      "description": "Model, Android version, screen/lock state, foreground app"
+    },
+    {
+      "name": "android_screenshot",
+      "description": "Screenshot with numbered element overlay"
+    },
+    {
+      "name": "android_ui",
+      "description": "Screen as a numbered element list"
+    },
+    {
+      "name": "android_tap",
+      "description": "Tap/long-press by element, text, or x/y"
+    },
+    {
+      "name": "android_type",
+      "description": "Type text, optionally into a field"
+    },
+    {
+      "name": "android_swipe",
+      "description": "Swipe between two points"
+    },
+    {
+      "name": "android_scroll",
+      "description": "Scroll screen or element"
+    },
+    {
+      "name": "android_key",
+      "description": "Press back/home/recents/enter/etc."
+    },
+    {
+      "name": "android_unlock",
+      "description": "Wake and swipe past the lock screen"
+    },
+    {
+      "name": "android_launch_app",
+      "description": "Open an app by name or package"
+    },
+    {
+      "name": "android_list_apps",
+      "description": "List installed packages"
+    },
+    {
+      "name": "android_open_url",
+      "description": "Open a URL or deep link"
+    },
+    {
+      "name": "android_wait_for",
+      "description": "Wait for text to appear/disappear"
+    },
+    {
+      "name": "android_shell",
+      "description": "Run a raw adb shell command"
+    }
+  ],
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

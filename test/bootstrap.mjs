@@ -1,0 +1,12 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+const server = process.argv[2]; const home = process.argv[3];
+const env = { ...process.env, ANDROID_CONTROL_HOME: home, PATH: process.env.PATH }; delete env.ADB_PATH; delete env.ANDROID_HOME;
+const t = new StdioClientTransport({ command: process.execPath, args: [server], env, stderr: "inherit" });
+const c = new Client({ name: "boot", version: "0" }); await c.connect(t);
+const t0 = Date.now();
+const r = await c.callTool({ name: "android_doctor", arguments: {} }, undefined, { timeout: 300000 });
+console.log(r.isError ? "ERROR" : "ok", ((Date.now() - t0) / 1000).toFixed(1) + "s\n" + r.content[0].text);
+const r2 = await c.callTool({ name: "android_screenshot", arguments: {} });
+console.log("screenshot w/o device ->", r2.isError ? "ERROR" : "ok", r2.content[0].text);
+await c.close(); process.exit(0);
